@@ -44,7 +44,7 @@ and run `npm run dev`. It isn't published to the Raycast Store.
 
 ## Search and actions
 
-- Plain text searches filenames and content. Duplicate files appear once, with DigUp's content ranking preserved.
+- Plain text searches filenames and content. Exact filenames, whole filename words and an unfinished final word get priority. Incidental substrings follow content results, whose DigUp ranking is preserved. Duplicate files appear once, keeping their content preview and matched location.
 - `name: invoice` searches filenames only. `content: pets clause` searches content only. `code:` uses DigUp's separate code index.
 - The type dropdown narrows candidates before searching. Folders and archives use Spotlight.
 - **Enter** opens the match. Media opens at its timestamp when supported by its player, PDFs use DigUp's Preview search, and code opens at the matched line in the selected editor.

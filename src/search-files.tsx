@@ -25,7 +25,7 @@ import {
   location,
   markdownText,
   queryParts,
-  uniqueNames,
+  mergeResults,
 } from "./search";
 import { nameSearch } from "./spotlight";
 
@@ -378,7 +378,12 @@ export default function Command(
       />
     );
   };
-  const onlyNames = uniqueNames(names, content);
+  const results = mergeResults(
+    names,
+    content,
+    parsed.text,
+    parsed.mode === "all" && !code,
+  );
   const status = [message, nameError].filter(Boolean).join(" ");
   return (
     <List
@@ -403,14 +408,25 @@ export default function Command(
           {recent.map(renderHit)}
         </List.Section>
       )}
-      {content.length > 0 && (
-        <List.Section title={code ? "Code" : "Content Matches"}>
-          {content.map(renderHit)}
+      {results.directNames.length > 0 && (
+        <List.Section title="Name Matches">
+          {results.directNames.map(renderHit)}
         </List.Section>
       )}
-      {onlyNames.length > 0 && (
-        <List.Section title="File and Folder Names">
-          {onlyNames.map(renderHit)}
+      {results.contentMatches.length > 0 && (
+        <List.Section title={code ? "Code" : "Content Matches"}>
+          {results.contentMatches.map(renderHit)}
+        </List.Section>
+      )}
+      {results.otherNames.length > 0 && (
+        <List.Section
+          title={
+            results.directNames.length
+              ? "More Name Matches"
+              : "File and Folder Names"
+          }
+        >
+          {results.otherNames.map(renderHit)}
         </List.Section>
       )}
       {status && (

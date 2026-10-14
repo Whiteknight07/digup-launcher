@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.1
+
+- Prioritized strong filename matches over related content, while keeping weak substring matches below content results.
+- Kept the matched page, timestamp and preview when a file is found by both name and content.
+- Preserved DigUp's original ranking for explicit content and code searches.
+
 ## 0.1.0
 
 - Combined Spotlight filenames and folders with local DigUp content search.

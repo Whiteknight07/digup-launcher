@@ -84,13 +84,84 @@ export function location(hit: Hit): string | undefined {
   return undefined;
 }
 
-export function uniqueNames(names: Hit[], content: Hit[]): Hit[] {
-  const seen = new Set(content.map((hit) => hit.path));
-  return names.filter((hit) => {
-    if (seen.has(hit.path)) return false;
-    seen.add(hit.path);
-    return true;
-  });
+function folded(text: string): string {
+  return text.normalize("NFKD").replace(/\p{M}/gu, "").toLowerCase();
+}
+
+function words(text: string): string[] {
+  // Treat spaces, punctuation and camelCase as word boundaries, as filenames commonly use all three.
+  return (
+    folded(text.replace(/([\p{Ll}\p{N}])(\p{Lu})/gu, "$1 $2")).match(
+      /[\p{L}\p{N}]+/gu,
+    ) ?? []
+  );
+}
+
+/** Strong literal name evidence, independent of DigUp's semantic scores. Incidental substrings
+ * ("art" in "cartography") don't displace a relevant content match. */
+export function nameMatchRank(hit: Hit, query: string): number | undefined {
+  const name = path.basename(hit.path);
+  const stem =
+    hit.kind === "folder"
+      ? name
+      : name.slice(0, name.length - path.extname(name).length);
+  const literal = folded(query.trim());
+  if (!literal) return undefined;
+  if (folded(name) === literal || folded(stem) === literal) return 0;
+  const terms = words(query);
+  const filenameWords = words(name);
+  if (!terms.length) return undefined;
+  if (terms.every((term) => filenameWords.includes(term))) return 1;
+  // Only the final word may be unfinished while typing. Numeric IDs must match in full.
+  const last = terms.length - 1;
+  if (
+    terms.every((term, i) =>
+      filenameWords.some(
+        (word) =>
+          word === term ||
+          (i === last &&
+            term.length >= 3 &&
+            /\p{L}/u.test(term) &&
+            word.startsWith(term)),
+      ),
+    )
+  )
+    return 2;
+  return undefined;
+}
+
+export function mergeResults(
+  names: Hit[],
+  content: Hit[],
+  query: string,
+  boostNames = true,
+) {
+  const contentByPath = new Map<string, Hit>();
+  for (const hit of content)
+    if (!contentByPath.has(hit.path)) contentByPath.set(hit.path, hit);
+  const namesByPath = new Map<string, Hit>();
+  for (const hit of names)
+    if (!namesByPath.has(hit.path)) namesByPath.set(hit.path, hit);
+  // Prefer the indexed match's page, timestamp, excerpt and type when both searches find a file.
+  const candidates = new Map([...namesByPath, ...contentByPath]);
+  const directNames = boostNames
+    ? rankNames(
+        [...candidates.values()].filter(
+          (hit) => nameMatchRank(hit, query) !== undefined,
+        ),
+        query,
+      ).sort((a, b) => nameMatchRank(a, query)! - nameMatchRank(b, query)!)
+    : [];
+  const promoted = new Set(directNames.map((hit) => hit.path));
+  return {
+    directNames,
+    contentMatches: [...contentByPath.values()].filter(
+      (hit) => !promoted.has(hit.path),
+    ),
+    otherNames: [...namesByPath.values()].filter(
+      (hit) => !promoted.has(hit.path) && !contentByPath.has(hit.path),
+    ),
+  };
 }
 
 export function rankNames(hits: Hit[], query: string): Hit[] {
