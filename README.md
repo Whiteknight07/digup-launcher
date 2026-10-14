@@ -23,6 +23,9 @@ or `where they talk about sleep`. `code: retry with backoff` searches code when 
 Content search fills in as the first index is built. Keep DigUp running for new files to be indexed;
 you can enable its launch-at-login option in DigUp's settings.
 
+If you already run DigUp from another location, quit that copy before opening the extension's bundled copy.
+The bundled copy shares DigUp's settings, model files and index.
+
 The native engine requires an Apple Silicon Mac with macOS 14 or later. Tinycast has its own
 [system requirements](https://tinycast.dev/). This extension was tested in Tinycast 0.11.19.
 
