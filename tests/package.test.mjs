@@ -11,7 +11,9 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
 
-const root = fileURLToPath(new URL("../release/digup/", import.meta.url));
+const root = process.env.DIGUP_PACKAGE_ROOT
+  ? path.resolve(process.env.DIGUP_PACKAGE_ROOT) + path.sep
+  : fileURLToPath(new URL("../release/digup/", import.meta.url));
 function walk(directory) {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     const file = path.join(directory, entry.name);
