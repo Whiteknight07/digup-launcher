@@ -1,0 +1,153 @@
+diff --git a/Resources/Info.plist b/Resources/Info.plist
+index 343a1e2..9ae6af5 100644
+--- a/Resources/Info.plist
++++ b/Resources/Info.plist
+@@ -30,6 +30,15 @@
+ 	<string>14.0</string>
+ 	<key>LSUIElement</key>
+ 	<true/>
++	<key>CFBundleURLTypes</key>
++	<array>
++		<dict>
++			<key>CFBundleURLName</key>
++			<string>com.abdurrahim.DigUp.launcher</string>
++			<key>CFBundleURLSchemes</key>
++			<array><string>digup</string></array>
++		</dict>
++	</array>
+ 	<key>NSAppleEventsUsageDescription</key>
+ 	<string>DigUp asks QuickTime Player to open a recording at the moment that matched your search.</string>
+ 	<key>NSDesktopFolderUsageDescription</key>
+diff --git a/Sources/DigUpApp/App.swift b/Sources/DigUpApp/App.swift
+index 64ec3d1..85055c8 100644
+--- a/Sources/DigUpApp/App.swift
++++ b/Sources/DigUpApp/App.swift
+@@ -1,8 +1,10 @@
+ import AppKit
++import DigUpKit
+ 
+ @main
+ final class AppDelegate: NSObject, NSApplicationDelegate {
+     private var app: AppController?
++    private var pendingLauncherURLs: [URL] = []
+ 
+     static func main() {
+         signal(SIGPIPE, SIG_IGN)   // a helper that just exited must surface as a write error, not kill the app
+@@ -40,9 +42,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
+         self.app = app
+         NSApp.mainMenu = Self.makeMainMenu(app)
+         app.start(showWindow: showWindow)
++        for url in pendingLauncherURLs { handleLauncherURL(url) }
++        pendingLauncherURLs.removeAll()
+         DebugHooks.run(app)
+     }
+ 
++    func application(_ application: NSApplication, open urls: [URL]) {
++        guard app != nil else { pendingLauncherURLs.append(contentsOf: urls); return }
++        for url in urls { handleLauncherURL(url) }
++    }
++
++    private func handleLauncherURL(_ url: URL) {
++        if url.scheme == "digup", url.host == "settings" { app?.showSettings(); return }
++        guard let app, let link = LauncherLink(url: url),
++              FileManager.default.fileExists(atPath: link.hit.path) else { return }
++        app.engine.open(ResultRow(link.hit, terms: Searcher.terms(link.query)))
++    }
++
+     /// Opening the app again (from Finder or Spotlight) while it runs: show its window.
+     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+         if !flag { app?.showSearchWindow() }
+diff --git a/Sources/DigUpApp/Updates.swift b/Sources/DigUpApp/Updates.swift
+index b523696..17ab921 100644
+--- a/Sources/DigUpApp/Updates.swift
++++ b/Sources/DigUpApp/Updates.swift
+@@ -23,6 +23,8 @@ final class Updates: NSObject, SPUUpdaterDelegate, SPUStandardUserDriverDelegate
+     /// Dev and test runs (their own defaults suite) don't check: Sparkle keeps its state in the app's real defaults.
+     /// `-debugUpdates YES` lets one check anyway.
+     func start() {
++        // Launcher bundles are updated with the extension; a stock app update would remove its URL handler.
++        guard Bundle.main.object(forInfoDictionaryKey: "DigUpLauncherBundle") as? Bool != true else { return }
+         let defaults = UserDefaults.standard
+         guard defaults.string(forKey: "defaultsSuite") == nil || defaults.bool(forKey: "debugUpdates") else { return }
+         controller.startUpdater()
+diff --git a/Sources/DigUpKit/LauncherLink.swift b/Sources/DigUpKit/LauncherLink.swift
+new file mode 100644
+index 0000000..98e6f73
+--- /dev/null
++++ b/Sources/DigUpKit/LauncherLink.swift
+@@ -0,0 +1,30 @@
++import Foundation
++
++/// A launcher hands the selected match back to the app, so the app's PDF, media and editor
++/// opening behavior stays in one place. The link contains metadata, never executable code.
++public struct LauncherLink: Sendable {
++    public let hit: SearchHit
++    public let query: String
++
++    public init?(url: URL) {
++        guard url.scheme == "digup", url.host == "open", url.absoluteString.count <= 65_536,
++              let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
++              let encoded = components.queryItems?.first(where: { $0.name == "hit" })?.value,
++              let data = encoded.data(using: .utf8),
++              let fields = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
++              let path = fields["path"] as? String, path.hasPrefix("/"), !path.contains("\0"),
++              let kindName = fields["kind"] as? String, let kind = FileKind(rawValue: kindName),
++              let segmentName = fields["segment"] as? String, let segment = SegmentKind(rawValue: segmentName)
++        else { return nil }
++        func number(_ key: String) -> Double? {
++            guard let value = fields[key] as? Double, value.isFinite, value >= 0, value <= 1_000_000_000 else { return nil }
++            return value
++        }
++        query = components.queryItems?.first(where: { $0.name == "query" })?.value ?? ""
++        hit = SearchHit(path: path, kind: kind, score: 0, z: nil, cosine: nil, keywordRank: nil,
++                        segment: segment, segmentID: (fields["segment_id"] as? NSNumber)?.int64Value ?? 0,
++                        loc: number("loc"), locEnd: number("loc_end"), excerpt: fields["excerpt"] as? String,
++                        modified: number("modified") ?? 0, size: (fields["size"] as? NSNumber)?.int64Value ?? 0,
++                        info: fields["info"] as? [String: String] ?? [:], focus: number("focus"))
++    }
++}
+diff --git a/Tests/DigUpKitTests/LauncherLinkTests.swift b/Tests/DigUpKitTests/LauncherLinkTests.swift
+new file mode 100644
+index 0000000..57deff4
+--- /dev/null
++++ b/Tests/DigUpKitTests/LauncherLinkTests.swift
+@@ -0,0 +1,39 @@
++import Foundation
++import Testing
++@testable import DigUpKit
++
++struct LauncherLinkTests {
++    private func link(_ fields: [String: Any], query: String = "pets & dogs") throws -> URL {
++        let data = try JSONSerialization.data(withJSONObject: fields)
++        var url = URLComponents(string: "digup://open")!
++        url.queryItems = [URLQueryItem(name: "hit", value: String(data: data, encoding: .utf8)),
++                          URLQueryItem(name: "query", value: query)]
++        return url.url!
++    }
++
++    @Test func preservesLocationsAndUnicode() throws {
++        let url = try link(["path": "/Users/me/বাংলা #1 & lease.pdf", "kind": "pdf", "segment": "page",
++                            "segment_id": 42, "loc": 4.0, "excerpt": "the «pets» clause"])
++        let parsed = try #require(LauncherLink(url: url))
++        #expect(parsed.hit.path == "/Users/me/বাংলা #1 & lease.pdf")
++        #expect(parsed.hit.loc == 4)
++        #expect(parsed.hit.segmentID == 42)
++        #expect(parsed.query == "pets & dogs")
++    }
++
++    @Test func rejectsMalformedAndForeignLinks() throws {
++        #expect(LauncherLink(url: URL(string: "https://open?hit=no")!) == nil)
++        #expect(LauncherLink(url: URL(string: "digup://open?hit=bad")!) == nil)
++        #expect(LauncherLink(url: try link(["path": "relative.pdf", "kind": "pdf", "segment": "page"])) == nil)
++        #expect(LauncherLink(url: try link(["path": "/tmp/file", "kind": "bogus", "segment": "page"])) == nil)
++    }
++
++    @Test func invalidPositionsCannotReachTheOpener() throws {
++        let url = try link(["path": "/tmp/code.swift", "kind": "code", "segment": "lines",
++                            "loc": -99, "loc_end": 999_999_999_999.0, "focus": 12])
++        let parsed = try #require(LauncherLink(url: url))
++        #expect(parsed.hit.loc == nil)
++        #expect(parsed.hit.locEnd == nil)
++        #expect(parsed.hit.focus == 12)
++    }
++}

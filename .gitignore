@@ -1,0 +1,13 @@
+node_modules/
+dist/
+release/
+assets/digup-bridge
+assets/DigUp.app/
+raycast-env.d.ts
+.native/
+.dev/
+artifacts/
+assets/LICENSE.DigUp.txt
+assets/LICENSE.digup-launcher.txt
+assets/NOTICE.txt
+.DS_Store

@@ -1,0 +1,20 @@
+DigUp Launcher
+Copyright (c) 2026 Stavan. Extension and launcher integration: MIT.
+
+DigUp is created by Abdur Rahim and distributed under the MIT license.
+Source: https://github.com/ARahim3/DigUp
+Pinned source commit: f9b8106ffb8308b4f48b76149d270f7c2e6b4918
+
+The icon is derived from DigUp's logo and retains its MIT attribution.
+native/digup-launcher.patch contains our URL-opening integration and disables
+stock app updates for the extension-bundled copy. The search engine is unchanged.
+
+The release includes a patched build of DigUp, llama.cpp and Sparkle.
+DigUp's MIT license is included at assets/LICENSE.DigUp.txt.
+Their additional license notices are included inside the bundled app at
+assets/DigUp.app/Contents/Resources/Acknowledgements.txt.
+
+EmbeddingGemma 2 model weights are downloaded by DigUp at setup time and are
+not included in this source repository or its release ZIP.
+
+This is an independent integration, not an official DigUp, Tinycast or Raycast release.

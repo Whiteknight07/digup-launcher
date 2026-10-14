@@ -1,0 +1,130 @@
+{
+  "$schema": "https://www.raycast.com/schemas/extension.json",
+  "name": "digup",
+  "title": "DigUp Launcher",
+  "description": "Search files by name and by what's inside them, locally on your Mac.",
+  "icon": "icon.png",
+  "author": "stavan",
+  "license": "MIT",
+  "categories": [
+    "Productivity",
+    "Developer Tools"
+  ],
+  "platforms": [
+    "macOS"
+  ],
+  "commands": [
+    {
+      "name": "search-files",
+      "title": "Search Files with DigUp",
+      "description": "Find files and folders by name, or describe an image, document, recording, or code.",
+      "mode": "view",
+      "keywords": [
+        "file",
+        "folder",
+        "semantic",
+        "spotlight",
+        "find",
+        "content"
+      ],
+      "arguments": [
+        {
+          "name": "query",
+          "type": "text",
+          "placeholder": "Name or description",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "setup",
+      "title": "Open DigUp Settings",
+      "description": "Open DigUp to choose folders and manage indexing.",
+      "mode": "no-view"
+    }
+  ],
+  "preferences": [
+    {
+      "name": "indexDirectory",
+      "title": "Content Index Folder",
+      "description": "Leave empty to use DigUp's configured index. Set only for a custom index.",
+      "type": "directory",
+      "required": false
+    },
+    {
+      "name": "nameScope",
+      "title": "File Name Search Folder",
+      "description": "Spotlight searches this folder and its subfolders. Defaults to your home folder.",
+      "type": "directory",
+      "required": false
+    },
+    {
+      "name": "searchMode",
+      "title": "Default Search Mode",
+      "description": "Combine content search with file and folder names, or use only one.",
+      "type": "dropdown",
+      "required": true,
+      "default": "all",
+      "data": [
+        {
+          "title": "Names and Content",
+          "value": "all"
+        },
+        {
+          "title": "Names Only",
+          "value": "names"
+        },
+        {
+          "title": "Content Only",
+          "value": "content"
+        }
+      ]
+    },
+    {
+      "name": "rememberRecent",
+      "title": "Recent Files",
+      "description": "Remember the last 20 files opened with this extension, stored locally.",
+      "type": "checkbox",
+      "label": "Show recently opened files",
+      "required": false,
+      "default": true
+    }
+  ],
+  "scripts": {
+    "build": "ray build -e dist -o dist",
+    "dev": "ray develop",
+    "lint": "eslint src && prettier --check src tests/search.test.ts tests/tinycast-runtime.mjs tests/package.test.mjs package.json native/upstream.json tsconfig.json eslint.config.js scripts/package.mjs",
+    "lint-store": "ray lint",
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test tests/*.test.ts",
+    "prepare-native": "bash scripts/prepare-native.sh",
+    "package": "npm run prepare-native && npm run build && node scripts/package.mjs",
+    "build:bridge": "bash scripts/build-bridge.sh",
+    "release": "bash scripts/release.sh",
+    "test:package": "node --test tests/package.test.mjs"
+  },
+  "dependencies": {
+    "@raycast/api": "^1.104.0"
+  },
+  "devDependencies": {
+    "@raycast/eslint-config": "^2.0.4",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "eslint": "^9.0.0",
+    "prettier": "^3.0.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0"
+  },
+  "version": "0.1.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Whiteknight07/digup-launcher.git"
+  },
+  "homepage": "https://github.com/Whiteknight07/digup-launcher#readme",
+  "bugs": {
+    "url": "https://github.com/Whiteknight07/digup-launcher/issues"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

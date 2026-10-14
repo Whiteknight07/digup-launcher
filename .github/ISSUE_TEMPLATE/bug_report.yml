@@ -1,0 +1,17 @@
+name: Bug report
+description: Report a problem with search, installation or a launcher action.
+body:
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: macOS, Mac architecture, launcher/version, extension version, search mode.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps and result
+      description: What did you do, what happened, and what did you expect? Use synthetic filenames and queries.
+    validations:
+      required: true

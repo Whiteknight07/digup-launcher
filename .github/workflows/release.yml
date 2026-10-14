@@ -1,0 +1,53 @@
+name: Release
+on:
+  push:
+    tags: [v*]
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - name: Check release version
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: test "$RELEASE_TAG" = "v$(node -p "require('./package.json').version")"
+      - uses: ./.github/actions/build
+      - name: Archive portable extension
+        shell: bash
+        run: |
+          mkdir -p artifacts
+          VERSION=$(node -p "require('./package.json').version")
+          ARCHIVE="digup-launcher-$VERSION-macos-arm64.zip"
+          ditto -c -k --keepParent --norsrc release/digup "artifacts/$ARCHIVE"
+          (cd artifacts && shasum -a 256 "$ARCHIVE" > "$ARCHIVE.sha256")
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release
+          path: artifacts/*
+          if-no-files-found: error
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: release
+          path: artifacts
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" artifacts/* --clobber
+          else
+            gh release create "$RELEASE_TAG" artifacts/* --verify-tag \
+              --title "DigUp Launcher $RELEASE_TAG" --generate-notes
+          fi

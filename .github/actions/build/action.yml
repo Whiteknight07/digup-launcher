@@ -1,0 +1,25 @@
+name: Build and validate
+description: Build the extension and pinned native engine; run tests and package validation.
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+      with:
+        node-version: 24
+        cache: npm
+    - name: Install dependencies
+      shell: bash
+      run: npm ci --ignore-scripts
+    - name: Check JavaScript and TypeScript
+      shell: bash
+      run: npm run typecheck && npm test && npm run lint
+    - name: Build native helpers and extension
+      shell: bash
+      run: npm run package
+    - name: Verify bridge and release contents
+      shell: bash
+      run: python3 tests/bridge_test.py && npm run test:package
+    - name: Test patched upstream engine
+      shell: bash
+      working-directory: .native/digup
+      run: swift test --parallel
